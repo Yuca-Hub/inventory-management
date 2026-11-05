@@ -6,6 +6,12 @@ export default {
     orders: '注文',
     finance: '財務',
     demandForecast: '需要予測',
+    restocking: '補充発注',
+    reports: 'レポート',
+    collapse: 'サイドバーを折りたたむ',
+    expand: 'サイドバーを展開',
+    openMenu: 'メニューを開く',
+    primaryNavigation: 'メインナビゲーション',
     companyName: '触媒コンポーネンツ',
     subtitle: '在庫管理システム'
   },
@@ -112,6 +118,13 @@ export default {
     onTimeDelivery: '定時配達',
     itemsCount: '{count}件',
     quantity: '数量',
+    submittedOrders: {
+      title: '提出済み注文',
+      empty: '提出済みの補充注文はまだありません。',
+      loadError: '提出済み注文の読み込みに失敗しました。',
+      submittedDate: '提出日',
+      leadTime: 'リードタイム'
+    },
     table: {
       orderNumber: '注文番号',
       orderId: '注文ID',
@@ -127,6 +140,40 @@ export default {
       expectedDelivery: '予定配達日',
       actualDelivery: '実際の配達日'
     }
+  },
+
+  // Restocking
+  restocking: {
+    title: '補充発注',
+    description: '需要予測に基づく不足数の優先順位に従い、予算内で補充購入を計画します',
+    budget: '予算',
+    budgetSlider: '補充予算',
+    selectedTotal: '選択合計',
+    remainingBudget: '残予算',
+    itemsSelected: '選択品目数',
+    recommendations: '推奨補充品目',
+    note: '品目は優先順位順に割り当てられ、全額が残予算に収まる場合のみ含まれます。スライダーを動かすと手動の選択はリセットされます。',
+    placeOrder: '発注する',
+    submitting: '送信中...',
+    leadTimeDays: '{days}日',
+    table: {
+      select: '選択',
+      sku: 'SKU',
+      name: '品名',
+      category: 'カテゴリ',
+      warehouse: '倉庫',
+      onHand: '現在庫',
+      forecast: '予測需要',
+      quantityToOrder: '発注数量',
+      unitCost: '単価',
+      lineCost: '明細金額',
+      leadTime: 'リードタイム'
+    },
+    success: '注文 {orderNumber} を送信しました。リードタイム: {leadTime}。',
+    viewOrders: '注文を表示',
+    empty: '現在、補充が必要な品目はありません。',
+    loadError: '補充候補の読み込みに失敗しました。',
+    submitError: '補充注文の送信に失敗しました。'
   },
 
   // Finance/Spending
@@ -200,6 +247,7 @@ export default {
 
   // Statuses
   status: {
+    submitted: '提出済み',
     delivered: '配達済み',
     shipped: '出荷済み',
     processing: '処理中',

@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from datetime import date, timedelta
 from typing import List, Optional
 from pydantic import BaseModel
 from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders
@@ -119,6 +120,90 @@ class CreatePurchaseOrderRequest(BaseModel):
     unit_cost: float
     expected_delivery_date: str
     notes: Optional[str] = None
+
+class RestockCandidate(BaseModel):
+    sku: str
+    name: str
+    category: str
+    warehouse: str
+    quantity_on_hand: int
+    forecasted_demand: int
+    shortfall: int
+    unit_cost: float
+    line_cost: float
+    lead_time_days: int
+
+class RestockOrderItem(BaseModel):
+    sku: str
+    quantity: int
+
+class CreateRestockOrderRequest(BaseModel):
+    items: List[RestockOrderItem]
+    budget: Optional[float] = None
+
+class RestockOrderLine(BaseModel):
+    sku: str
+    name: str
+    quantity: int
+    unit_cost: float
+    line_cost: float
+    lead_time_days: int
+
+class RestockOrder(BaseModel):
+    id: str
+    order_number: str
+    items: List[RestockOrderLine]
+    total_value: float
+    lead_time_days: int
+    submitted_date: str
+    expected_delivery: str
+    status: str
+    budget: Optional[float] = None
+
+# Restocking orders live in memory only; like the JSON-backed data, they reset on server restart
+restocking_orders: list = []
+
+# The data has no supplier lead times, so lead time is a per-category constant
+CATEGORY_LEAD_TIME_DAYS = {
+    'Actuators': 14,
+    'Circuit Boards': 10,
+    'Controllers': 12,
+    'Power Supplies': 8,
+    'Sensors': 7,
+}
+DEFAULT_LEAD_TIME_DAYS = 10
+
+def get_restock_candidates() -> list:
+    """Join demand forecasts to inventory by SKU and return items forecast to run short, most short first"""
+    inventory_by_sku = {item['sku']: item for item in inventory_items}
+    candidates = []
+
+    for forecast in demand_forecasts:
+        item = inventory_by_sku.get(forecast['item_sku'])
+        # Forecast SKUs without an inventory record have no cost or stock to base a recommendation on
+        if not item:
+            continue
+
+        shortfall = forecast['forecasted_demand'] - item['quantity_on_hand']
+        if shortfall <= 0:
+            continue
+
+        candidates.append({
+            'sku': item['sku'],
+            'name': item['name'],
+            'category': item['category'],
+            'warehouse': item['warehouse'],
+            'quantity_on_hand': item['quantity_on_hand'],
+            'forecasted_demand': forecast['forecasted_demand'],
+            'shortfall': shortfall,
+            'unit_cost': item['unit_cost'],
+            'line_cost': round(shortfall * item['unit_cost'], 2),
+            'lead_time_days': CATEGORY_LEAD_TIME_DAYS.get(item['category'], DEFAULT_LEAD_TIME_DAYS),
+        })
+
+    # Ties broken by SKU so the priority order is stable
+    candidates.sort(key=lambda c: (-c['shortfall'], c['sku']))
+    return candidates
 
 # API endpoints
 @app.get("/")
@@ -303,6 +388,70 @@ def get_monthly_trends():
     result = list(months.values())
     result.sort(key=lambda x: x['month'])
     return result
+
+@app.get("/api/restocking/candidates", response_model=List[RestockCandidate])
+def get_restocking_candidates():
+    """Get items forecast to run short of demand, in restocking priority order"""
+    return get_restock_candidates()
+
+@app.post("/api/restocking/orders", response_model=RestockOrder, status_code=201)
+def create_restocking_order(request: CreateRestockOrderRequest):
+    """Submit a restocking order; prices and lead times are taken from server data, not the client"""
+    if not request.items:
+        raise HTTPException(status_code=400, detail="Order must contain at least one item")
+
+    skus = [item.sku for item in request.items]
+    if len(set(skus)) != len(skus):
+        raise HTTPException(status_code=400, detail="Duplicate SKUs in order")
+
+    candidates_by_sku = {c['sku']: c for c in get_restock_candidates()}
+    lines = []
+    for requested in request.items:
+        candidate = candidates_by_sku.get(requested.sku)
+        if not candidate:
+            raise HTTPException(status_code=404, detail=f"SKU {requested.sku} is not a restocking candidate")
+        # Ordering more than the forecast shortfall would just create excess stock
+        if requested.quantity < 1 or requested.quantity > candidate['shortfall']:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Quantity for {requested.sku} must be between 1 and {candidate['shortfall']}"
+            )
+        lines.append({
+            'sku': candidate['sku'],
+            'name': candidate['name'],
+            'quantity': requested.quantity,
+            'unit_cost': candidate['unit_cost'],
+            'line_cost': round(requested.quantity * candidate['unit_cost'], 2),
+            'lead_time_days': candidate['lead_time_days'],
+        })
+
+    total_value = round(sum(line['line_cost'] for line in lines), 2)
+    if request.budget is not None and total_value > request.budget:
+        raise HTTPException(status_code=400, detail="Order total exceeds the stated budget")
+
+    # The order arrives when its slowest item does
+    lead_time_days = max(line['lead_time_days'] for line in lines)
+    today = date.today()
+    order_number = len(restocking_orders) + 1
+
+    order = {
+        'id': str(order_number),
+        'order_number': f"RST-{order_number:04d}",
+        'items': lines,
+        'total_value': total_value,
+        'lead_time_days': lead_time_days,
+        'submitted_date': today.isoformat(),
+        'expected_delivery': (today + timedelta(days=lead_time_days)).isoformat(),
+        'status': 'Submitted',
+        'budget': request.budget,
+    }
+    restocking_orders.append(order)
+    return order
+
+@app.get("/api/restocking/orders", response_model=List[RestockOrder])
+def get_restocking_orders():
+    """Get submitted restocking orders, newest first"""
+    return list(reversed(restocking_orders))
 
 if __name__ == "__main__":
     import uvicorn
