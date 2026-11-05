@@ -1,42 +1,49 @@
 <template>
-  <div class="app">
-    <header class="top-nav">
-      <div class="nav-container">
-        <div class="logo">
-          <h1>{{ t('nav.companyName') }}</h1>
-          <span class="subtitle">{{ t('nav.subtitle') }}</span>
-        </div>
-        <nav class="nav-tabs">
-          <router-link to="/" :class="{ active: $route.path === '/' }">
-            {{ t('nav.overview') }}
-          </router-link>
-          <router-link to="/inventory" :class="{ active: $route.path === '/inventory' }">
-            {{ t('nav.inventory') }}
-          </router-link>
-          <router-link to="/orders" :class="{ active: $route.path === '/orders' }">
-            {{ t('nav.orders') }}
-          </router-link>
-          <router-link to="/spending" :class="{ active: $route.path === '/spending' }">
-            {{ t('nav.finance') }}
-          </router-link>
-          <router-link to="/demand" :class="{ active: $route.path === '/demand' }">
-            {{ t('nav.demandForecast') }}
-          </router-link>
-          <router-link to="/reports" :class="{ active: $route.path === '/reports' }">
-            Reports
-          </router-link>
-        </nav>
+  <div class="app" :class="{ 'is-mobile': isMobile }">
+    <AppSidebar
+      :collapsed="collapsed"
+      :is-mobile="isMobile"
+      :drawer-open="drawerOpen"
+      @toggle="toggleCollapsed"
+    >
+      <template #footer>
         <LanguageSwitcher />
         <ProfileMenu
           @show-profile-details="showProfileDetails = true"
           @show-tasks="showTasks = true"
         />
-      </div>
-    </header>
-    <FilterBar />
-    <main class="main-content">
-      <router-view />
-    </main>
+      </template>
+    </AppSidebar>
+
+    <div
+      v-if="isMobile && drawerOpen"
+      class="sidebar-backdrop"
+      aria-hidden="true"
+      @click="closeDrawer"
+    ></div>
+
+    <div class="content">
+      <header v-if="isMobile" class="mobile-bar">
+        <button
+          ref="menuButton"
+          type="button"
+          class="menu-button"
+          :aria-label="t('nav.openMenu')"
+          aria-controls="app-sidebar"
+          :aria-expanded="drawerOpen ? 'true' : 'false'"
+          @click="openDrawer"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true" focusable="false">
+            <path d="M4 6h16 M4 12h16 M4 18h16" />
+          </svg>
+        </button>
+        <span class="mobile-title">{{ t('nav.companyName') }}</span>
+      </header>
+      <FilterBar />
+      <main class="main-content">
+        <router-view />
+      </main>
+    </div>
 
     <ProfileDetailsModal
       :is-open="showProfileDetails"
@@ -55,15 +62,18 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { api } from './api'
 import { useAuth } from './composables/useAuth'
 import { useI18n } from './composables/useI18n'
+import { useSidebar } from './composables/useSidebar'
 import FilterBar from './components/FilterBar.vue'
 import ProfileMenu from './components/ProfileMenu.vue'
 import ProfileDetailsModal from './components/ProfileDetailsModal.vue'
 import TasksModal from './components/TasksModal.vue'
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
+import AppSidebar from './components/AppSidebar.vue'
 
 export default {
   name: 'App',
@@ -72,11 +82,28 @@ export default {
     ProfileMenu,
     ProfileDetailsModal,
     TasksModal,
-    LanguageSwitcher
+    LanguageSwitcher,
+    AppSidebar
   },
   setup() {
     const { currentUser } = useAuth()
     const { t } = useI18n()
+    const route = useRoute()
+    const { collapsed, isMobile, drawerOpen, toggleCollapsed, openDrawer, closeDrawer } = useSidebar()
+    const menuButton = ref(null)
+
+    // Close the drawer on navigation.
+    watch(() => route.fullPath, closeDrawer)
+
+    // Move focus into the drawer when it opens and back to the menu button when it closes.
+    watch(drawerOpen, async (open) => {
+      await nextTick()
+      if (open) {
+        document.querySelector('#app-sidebar .nav-link')?.focus()
+      } else if (menuButton.value) {
+        menuButton.value.focus()
+      }
+    })
     const showProfileDetails = ref(false)
     const showTasks = ref(false)
     const apiTasks = ref([])
@@ -150,6 +177,13 @@ export default {
 
     return {
       t,
+      collapsed,
+      isMobile,
+      drawerOpen,
+      toggleCollapsed,
+      openDrawer,
+      closeDrawer,
+      menuButton,
       showProfileDetails,
       showTasks,
       tasks,
@@ -177,93 +211,72 @@ body {
 }
 
 .app {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  /* Sidebar column sizes to the sidebar's own (transitioning) width. */
+  grid-template-columns: auto minmax(0, 1fr);
   min-height: 100vh;
+  --filter-bar-top: 0px;
 }
 
-.top-nav {
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+.app.is-mobile {
+  grid-template-columns: minmax(0, 1fr);
+  /* Sticky filter bar sits below the slim top bar. */
+  --filter-bar-top: 48px;
+}
+
+/* min-width: 0 stops wide tables from blowing out the grid column. */
+.content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-bar {
   position: sticky;
   top: 0;
   z-index: 100;
-}
-
-.nav-container {
-  max-width: 1600px;
-  margin: 0 auto;
+  height: 48px;
   display: flex;
   align-items: center;
-  padding: 0 2rem;
-  height: 70px;
-}
-
-.nav-container > .nav-tabs {
-  margin-left: auto;
-  margin-right: 1rem;
-}
-
-.nav-container > .language-switcher {
-  margin-right: 1rem;
-}
-
-.logo {
-  display: flex;
-  align-items: baseline;
   gap: 0.75rem;
+  padding: 0 0.75rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.logo h1 {
-  font-size: 1.375rem;
+.mobile-title {
   font-weight: 700;
   color: #0f172a;
   letter-spacing: -0.025em;
 }
 
-.subtitle {
-  font-size: 0.813rem;
-  color: #64748b;
-  font-weight: 400;
-  padding-left: 0.75rem;
-  border-left: 1px solid #e2e8f0;
-}
-
-.nav-tabs {
+.menu-button {
   display: flex;
-  gap: 0.25rem;
-}
-
-.nav-tabs a {
-  padding: 0.625rem 1.25rem;
-  color: #64748b;
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.938rem;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
   border-radius: 6px;
-  transition: all 0.2s ease;
-  position: relative;
+  background: transparent;
+  color: #0f172a;
+  cursor: pointer;
 }
 
-.nav-tabs a:hover {
-  color: #0f172a;
+.menu-button:hover {
   background: #f1f5f9;
 }
 
-.nav-tabs a.active {
-  color: #2563eb;
-  background: #eff6ff;
+.menu-button:focus-visible {
+  outline: 2px solid #0f172a;
+  outline-offset: 2px;
 }
 
-.nav-tabs a.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #2563eb;
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  background: rgba(15, 23, 42, 0.4);
 }
 
 .main-content {

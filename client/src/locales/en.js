@@ -6,6 +6,12 @@ export default {
     orders: 'Orders',
     finance: 'Finance',
     demandForecast: 'Demand Forecast',
+    restocking: 'Restocking',
+    reports: 'Reports',
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar',
+    openMenu: 'Open menu',
+    primaryNavigation: 'Primary navigation',
     companyName: 'Catalyst Components',
     subtitle: 'Inventory Management System'
   },
@@ -112,6 +118,13 @@ export default {
     onTimeDelivery: 'On-Time Delivery',
     itemsCount: '{count} items',
     quantity: 'Qty',
+    submittedOrders: {
+      title: 'Submitted Orders',
+      empty: 'No restocking orders have been submitted yet.',
+      loadError: 'Failed to load submitted orders.',
+      submittedDate: 'Submitted',
+      leadTime: 'Lead Time'
+    },
     table: {
       orderNumber: 'Order Number',
       orderId: 'Order ID',
@@ -127,6 +140,40 @@ export default {
       expectedDelivery: 'Expected Delivery',
       actualDelivery: 'Actual Delivery'
     }
+  },
+
+  // Restocking
+  restocking: {
+    title: 'Restocking',
+    description: 'Plan replenishment purchases within a budget, prioritised by forecast shortfall',
+    budget: 'Budget',
+    budgetSlider: 'Restocking budget',
+    selectedTotal: 'Selected Total',
+    remainingBudget: 'Remaining Budget',
+    itemsSelected: 'Items Selected',
+    recommendations: 'Recommended Restocking',
+    note: 'Items are filled in priority order. An item is included only if its full cost fits the remaining budget. Moving the slider resets manual selections.',
+    placeOrder: 'Place Order',
+    submitting: 'Submitting...',
+    leadTimeDays: '{days} days',
+    table: {
+      select: 'Select',
+      sku: 'SKU',
+      name: 'Name',
+      category: 'Category',
+      warehouse: 'Warehouse',
+      onHand: 'On Hand',
+      forecast: 'Forecast',
+      quantityToOrder: 'Qty to Order',
+      unitCost: 'Unit Cost',
+      lineCost: 'Line Cost',
+      leadTime: 'Lead Time'
+    },
+    success: 'Order {orderNumber} submitted. Lead time: {leadTime}.',
+    viewOrders: 'View orders',
+    empty: 'No items currently need restocking.',
+    loadError: 'Failed to load restocking candidates.',
+    submitError: 'Failed to submit restocking order.'
   },
 
   // Finance/Spending
@@ -200,6 +247,7 @@ export default {
 
   // Statuses
   status: {
+    submitted: 'Submitted',
     delivered: 'Delivered',
     shipped: 'Shipped',
     processing: 'Processing',

@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 Factory Inventory Management System Demo with GitHub integration - Full-stack application with Vue 3 frontend, Python FastAPI backend, and in-memory mock data (no database).
 
 > ⚠️ **This repository and any fork you create are PUBLIC.** Do not commit credentials, internal hostnames, or private registry URLs. `client/.npmrc` pins the public npm registry and `client/package-lock.json` is gitignored to prevent locally-configured registries from leaking into commits — leave both in place.
@@ -41,6 +43,26 @@ uv run python main.py
 cd client
 npm install && npm run dev
 ```
+
+## Commands
+
+```bash
+./scripts/start.sh / ./scripts/stop.sh      # Install missing deps and run/stop both servers (same as /start, /stop)
+cd client && npm run build                  # Production build (no client lint or test setup exists)
+cd tests && uv run pytest -v                # All backend tests
+cd tests && uv run pytest backend/test_inventory.py::TestInventoryEndpoints::<test_name> -v   # Single test
+cd server && uv run python generate_data.py # Regenerate sample data (check it writes where you expect before committing)
+```
+
+Backend deps (`fastapi`, `pytest`, `httpx`, ...) are declared only in `server/pyproject.toml`; there is no `pyproject.toml` in `tests/` or the repo root. If `uv run pytest` in `tests/` cannot import them, run it from `server/` with `../tests/backend` as the path. `tests/README.md` lists a `test_orders.py` that does not exist; the real files are `test_dashboard.py`, `test_inventory.py`, `test_misc_endpoints.py`.
+
+## Architecture
+
+- **Backend** (`server/main.py`): single file holding Pydantic models, shared `apply_filters` / `filter_by_month` helpers, and all routes. `server/mock_data.py` loads every JSON file in `server/data/` once at import, so data edits need a server restart. Quarter filters (`Q1-2025`...) are expanded by `QUARTER_MAP` and matched by substring against `order_date`.
+- **Frontend** (`client/src`): routes are declared in `main.js` (Dashboard, Inventory, Orders, Demand, Spending, Reports). `api.js` is the only HTTP layer and hardcodes `http://localhost:8001/api`. It omits any filter whose value is `'all'`.
+- **Filter state**: `composables/useFilters.js` holds module-level refs (a shared singleton across all views) and maps the Time Period selection to the `month` query param via `getCurrentFilters()`. New filters must be added there, in `api.js`, and in the backend endpoint.
+- **i18n and auth**: `composables/useI18n.js` with `locales/en.js` and `ja.js`. Add new UI strings to both. `useAuth.js` is client-side only.
+- **Dev tooling**: `.claude/agents`, `.claude/commands` and `.claude/hooks` define the subagents, slash commands and tool-usage logger referenced above.
 
 ## Key Patterns
 
